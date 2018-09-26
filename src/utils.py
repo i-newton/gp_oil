@@ -21,7 +21,7 @@ def get_train():
                                     right_on="Скважина")
     all_recs = pd.merge(train_main_frac_gdis, train_aux_coords, how="left", left_on="Скважина", right_on="well_hash")
     final_recs = all_recs.drop(["well_hash"], axis=1)
-    return final_recs
+    return final_recs.drop_duplicates()
 
 
 def get_test():
