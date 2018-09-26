@@ -1,5 +1,5 @@
 import pandas as pd
-
+import numpy as np
 
 def show_uniq_test_train(train, test):
     # check all values that have zero ans nan only
@@ -86,3 +86,98 @@ def split_continious_date_categorical_text(df):
 
 def get_fold():
     return KFold(n_splits = 4,shuffle=True, random_state = 17)
+
+
+def clean_non_targeted(train_array, y_train, dates_ord=None):
+    clean_array = []
+    train_array.append(y_train)
+    #clear nans in target
+    indexes_to_delete = y_train[(y_train.isnull())|(y_train==0)].index
+    if dates_ord is not None:
+        dates_index = dates_ord[dates_ord>=6].index
+        indexes_to_delete = indexes_to_delete.union(dates_index)
+    for df in train_array:
+        item = df.drop(index=indexes_to_delete)
+        clean_array.append(item)
+        print(item.shape)
+    return clean_array
+
+
+def check_passed(to_test, df):
+    for c in df.columns:
+        if df[c].corr(to_test) > 0.8:
+            return False
+    return True
+
+
+def square_cont(train, test, y):
+    columns = []
+    train_squared = []
+    print("started squaring")
+    for c1 in train.columns:
+        for c2 in train.columns:
+            name = str(c1) + "1_" + str(c2) + "2"
+            sq_item = train[c1].multiply(train[c2])
+            sq_item.rename(name, inplace=True)
+            corr = sq_item.corr(y)
+            if (corr > 0.1 or corr < -0.1) and check_passed(sq_item, train):
+                columns.append((c1, c2))
+                train_squared.append(sq_item)
+    print("finish squaring")
+    test_squared = []
+    for c1, c2 in columns:
+        name = str(c1) + "1_" + str(c2) + "2"
+        sq_item = test[c1].multiply(test[c2])
+        sq_item.rename(name, inplace=True)
+        test_squared.append(sq_item)
+    return pd.concat(train_squared, axis=1), pd.concat(test_squared, axis=1)
+
+
+def  sqrt(x):
+    if np.all(x>0):
+        return np.sqrt(x)
+    return 0
+def reverse(x):
+    if np.all(x!=0):
+        return 1/x
+    return 0
+
+def log(x):
+    if np.all(x>0):
+        return np.log(x)
+    return 0
+
+transformations = {"log":log,
+                   "exp":np.exp,
+                   "sqrt":sqrt,
+                   "sq":lambda x: x**2,
+                   "cube":lambda x:x**3,
+                   "reverse":reverse,
+                   "orig":lambda x:x}
+
+def get_max_correlation(x,y):
+    max_corr = 0
+    max_corr_fn = "orig"
+    for n,tf in transformations.items():
+        x_tf = x.apply(tf)
+        corr = abs(y.corr(x_tf))
+        if corr>max_corr:
+            max_corr = corr
+            max_corr_fn  = n
+    return max_corr_fn
+
+def transform_with_max_corr(train, test, y):
+    for c in train.columns[:150]:
+        fn = get_max_correlation(train[c], y)
+        if fn != "orig":
+            train.loc[:,c] = train[c].apply(transformations[fn])
+            test.loc[:,c] = test[c].apply(transformations[fn])
+    return train, test
+
+
+from sklearn.metrics import make_scorer
+def my_loss(y_true, y_pred,**kwargs):
+    loss = np.abs(np.exp(y_true) - np.exp(y_pred))
+    return np.average(loss)
+
+my_score = make_scorer(my_loss, greater_is_better=False)

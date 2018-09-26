@@ -45,7 +45,7 @@ class DataCleaner:
         print(text)
         print(train.isnull().values.any() or test.isnull().values.any())
 
-    def get_clean_data(self, train, test):
+    def get_clean_data(self, train, test, group_col=None):
         # starting with hooks
         train_after_hook = self.launch_single_tf(train, self.train_hooks)
         test_after_hook = self.launch_single_tf(test, self.test_hooks)
@@ -63,7 +63,14 @@ class DataCleaner:
             traincppl, testcppl = ppl(train_common, test_common)
             train_common_ppl.append(traincppl)
             test_common_ppl.append(testcppl)
-        train_cppl = pd.concat(train_common_ppl, axis=1)
-        test_cppl = pd.concat(test_common_ppl, axis=1)
-        self.log_nan("nans in column pipelines", train_cppl, test_cppl)
-        self.log_shape("shape_after_column_pipelines", train_cppl, test_cppl)
+
+        train_after_ppl = pd.concat(train_common_ppl, axis=1)
+        test_after_ppl = pd.concat(test_common_ppl, axis=1)
+        self.log_nan("nans in column pipelines", train_after_ppl, test_after_ppl)
+        self.log_shape("shape_after_column_pipelines", train_after_ppl,
+                       test_after_ppl)
+        if group_col:
+            train_group = train[group_col]
+            return train_after_ppl, test_after_ppl, target, train_group
+        else:
+            return train_after_ppl, test_after_ppl, target

@@ -42,7 +42,7 @@ class ColumnPipelineStep(PipelineStep):
 
 # sort by converted date and group
 def convert_and_sort(df):
-    df["Дата"] =  df["Дата"].apply(pd.to_datetime)
+    df["Дата"] = df["Дата"].apply(pd.to_datetime)
     return df.sort_values(by=["Скважина", "Дата"])
 
 
@@ -97,7 +97,8 @@ target_hook = Hook(tf=get_target)
 
 
 def get_text_cols():
-    text = ["Причина простоя"]
+    text = ["Причина простоя",
+            "Причина простоя.1",]
     return text
 
 
@@ -128,21 +129,13 @@ def get_cat_cols():
                    "Мероприятия",
                    "Проппант",
                    "Куст",
-                   "Причина простоя.1",
                    'ПЛАСТ'
                    ]
     return categorical
 
 
 def get_date_cols():
-    dates = ["Дата",
-             "Дата_2",
-             "Дата ГРП",
-             "Время до псевдоуст-ся режима",
-             "Дата запуска после КРС",
-             "Дата пуска",
-             "Дата останова",
-             "Дата ввода в эксплуатацию"]
+    dates = ["Скважина", "Дата"]
     return dates
 
 
@@ -153,7 +146,7 @@ def get_coord_cols():
 
 def get_cont_cols():
     all_cols = [
-        # "Скважина",
+        # ,
         "Дата",
         "ГТМ",
         "Метод",
@@ -292,6 +285,12 @@ def get_cont_cols():
         "ПЛАСТ_X",
         "ПЛАСТ_Y",
         "Альтитуда",
+        "Дата ГРП",
+        "Время до псевдоуст-ся режима",
+        "Дата запуска после КРС",
+        "Дата пуска",
+        "Дата останова",
+        "Дата ввода в эксплуатацию"
     ]
     continious = list(set(all_cols) - set(get_date_cols()) - set(get_cat_cols())
                       - set(get_text_cols()) - set(get_coord_cols()))
@@ -310,7 +309,7 @@ def convert_locale_to_float(df):
     loc_float = get_object_columns(df)
     converted = df.copy()
     for c in loc_float:
-        converted.loc[:,c] = df[c].apply(get_float)
+        converted.loc[:, c] = df[c].apply(get_float)
     return converted
 
 
@@ -343,27 +342,92 @@ normalize_step = PipelineStep(tf=normalize)
 
 
 def null_cat(train, test):
-    return train.isnull().astype(int).add_suffix('_indicator'), test.isnull().astype(int).add_suffix('_indicator')
+    train = train.isnull().astype(int).add_suffix('_indicator')
+    test = test.isnull().astype(int).add_suffix('_indicator')
+
+    return train, test
 
 
-null_cat_step = PipelineStep(tf=null_cat)
+null_cat_step = ColumnPipelineStep(columns=get_cont_cols(),
+                                   tf=null_cat)
 
 
 cont_pipeline = ColumnPipelineStep(columns=get_cont_cols(),
-                                   tf=[to_float_step, median_step, normalize_step, null_cat_step])
+                                   tf=[to_float_step, median_step,
+                                       normalize_step])
 
 
 def get_one_hot(train, test):
-    for c in train.columns:
-        train.loc[c,:] = train[c].astype(str)
-        test.loc[c,:] = test[c].astype(str)
+    if isinstance(train, pd.Series):
+        train = train.astype(str)
+        test = test.astype(str)
+    else:
+        for c in train.columns:
+            train[c] = train[c].astype(str)
+            test[c] = test[c].astype(str)
     train_oh = pd.get_dummies(train, drop_first=True)
     test_oh = pd.get_dummies(test, drop_first=True)
     test_oh = test_oh.reindex(columns=train_oh.columns, fill_value=0)
-    print(train_oh.isnull().values.any() or test_oh.isnull().values.any())
     return train_oh, test_oh
 
 
 cat_pipeline = ColumnPipelineStep(columns=get_cat_cols(), tf=get_one_hot)
 
 
+def text_trasnsform_pipeline(train, test):
+    for c in train.columns:
+        train[c] = train[c].str.lower()
+        test[c] = test[c].str.lower()
+    return train, test
+
+
+text_pipeline = ColumnPipelineStep(columns=get_text_cols(),
+                                   tf=[text_trasnsform_pipeline, get_one_hot])
+
+
+def transform_dates_into_order(dates, group):
+    grouped = pd.concat([dates, group], axis=1)
+    idx = []
+    orders = []
+    for name, group in grouped.groupby(["Скважина"]):
+        index = group.index
+        for i in range(len(index)):
+            idx.append(index[i])
+            orders.append(i)
+    ord_index = pd.Index(idx)
+    ordered_fr = pd.Series(orders, index=ord_index, dtype="int32",
+                           name="pos_number")
+    return ordered_fr
+
+
+def get_time_of_year(dates):
+    def time_of_year(date):
+        month = date.month
+        if month >= 3 or month < 6:
+            return 1
+        elif month >= 6 or month < 9:
+            return 2
+        elif month >= 9 or month < 12:
+            return 3
+        else:
+            return 4
+    return dates.apply(time_of_year)
+
+
+def date_transform(train, test):
+    train_date = train["Дата"].apply(pd.to_datetime)
+    train_group = train["Скважина"]
+    train_cat_ord = transform_dates_into_order(train_date, train_group)
+    train_cat_toy = get_time_of_year(train_date)
+    train = pd.concat([train_cat_ord, train_cat_toy], axis=1)
+
+    test_date = test["Дата"].apply(pd.to_datetime)
+    test_cat_ord = pd.Series(0, index=test_date.index, dtype="int32",
+                             name="pos_number")
+    test_cat_toy = get_time_of_year(test_date)
+    test_f = pd.concat([test_cat_ord, test_cat_toy], axis=1)
+    return train, test_f
+
+
+date_pipeline = ColumnPipelineStep(columns=get_date_cols(),
+                                   tf=[date_transform, get_one_hot])
