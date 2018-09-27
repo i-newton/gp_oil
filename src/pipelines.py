@@ -356,6 +356,7 @@ cont_pipeline = ColumnPipelineStep(columns=get_cont_cols(),
                                    tf=[to_float_step, median_step,
                                        normalize_step])
 
+from functools import partial
 
 def get_one_hot(train, test, drop_first=True):
     if isinstance(train, pd.Series):
@@ -369,6 +370,9 @@ def get_one_hot(train, test, drop_first=True):
     test_oh = pd.get_dummies(test, drop_first=drop_first)
     test_oh = test_oh.reindex(columns=train_oh.columns, fill_value=0)
     return train_oh, test_oh
+
+
+one_hot_no_drop = partial(get_one_hot, drop_first=False)
 
 
 cat_pipeline = ColumnPipelineStep(columns=get_cat_cols(), tf=get_one_hot)
@@ -430,4 +434,4 @@ def date_transform(train, test):
 
 
 date_pipeline = ColumnPipelineStep(columns=get_date_cols(),
-                                   tf=[date_transform, get_one_hot])
+                                   tf=[date_transform, one_hot_no_drop])

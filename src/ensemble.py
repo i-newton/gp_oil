@@ -6,7 +6,7 @@ pd.set_option('display.max_rows', 500)
 from sklearn.linear_model import Ridge, Lasso
 from sklearn.ensemble import RandomForestRegressor,ExtraTreesRegressor
 from sklearn.model_selection import cross_val_predict
-from sklearn.svm import LinearSVR
+from sklearn.svm import SVR
 import xgboost as xgb
 MAX_TOWERS = 6
 from sklearn.neural_network import MLPRegressor
@@ -15,18 +15,15 @@ from sklearn.neural_network import MLPRegressor
 class Ensembler:
 
     def __init__(self):
-        self.pred_names = ["lasso", "rtree", "xgboost"]
-        ridge = Ridge(random_state=17)
-        rtree = RandomForestRegressor(n_jobs=-1,
-                                      random_state=17)
-        svr = LinearSVR(random_state=17)
-        xgboost = xgb.XGBRegressor(random_state=17, n_jobs=-1)
-        nn = MLPRegressor(max_iter=500, random_state=17)
-        et = ExtraTreesRegressor(n_jobs=-1, n_estimators=100, random_state=17)
-        lasso = Lasso(random_state=17,tol=0.001)
+        self.pred_names = ["lasso", "rtree", "xgboost","ridge", "svr"]
+        ridge = Ridge(random_state=17, alpha=18)
+        rtree = RandomForestRegressor(n_jobs=-1, random_state=19)
+        xgboost = xgb.XGBRegressor(random_state=23, n_jobs=-1)
+        lasso = Lasso(random_state=29, tol=0.001, alpha=0.55)
+        svr= SVR(random_state=31)
 
-        self.predictors = [lasso, rtree, xgboost]
-        self.stack_predictor = xgb.XGBRegressor(random_state=17, n_jobs=-1)
+        self.predictors = [lasso, rtree, xgboost, ridge, svr]
+        self.stack_predictor = xgb.XGBRegressor(random_state=37, n_jobs=-1)
 
     def _get_train_preds(self, X, y):
         predicts = []
@@ -42,7 +39,7 @@ class Ensembler:
         for rgr in self.predictors:
             rgr.fit(X_train, y_train)
         #fit stack regressor
-        self.stack_predictor.fit(predicts, y_train)
+        self.stack_predictor.fit(predicts, y_train, eval_metric="mae")
 
     def predict(self, X_test):
         test_predicts = []

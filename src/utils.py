@@ -188,6 +188,7 @@ transformations = {"log":log,
                    "reverse":reverse,
                    "orig":lambda x:x}
 
+
 def get_max_correlation(x,y):
     max_corr = 0
     max_corr_fn = "orig"
@@ -199,6 +200,7 @@ def get_max_correlation(x,y):
             max_corr_fn  = n
     return max_corr_fn
 
+
 def transform_with_max_corr(train, test, y):
     for c in train.columns[:150]:
         fn = get_max_correlation(train[c], y)
@@ -209,8 +211,10 @@ def transform_with_max_corr(train, test, y):
 
 
 from sklearn.metrics import make_scorer
+
 def my_loss(y_true, y_pred,**kwargs):
     loss = np.abs(np.exp(y_true) - np.exp(y_pred))
     return np.average(loss)
+
 
 my_score = make_scorer(my_loss, greater_is_better=False)
