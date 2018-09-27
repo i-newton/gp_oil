@@ -1,6 +1,9 @@
 import pandas as pd
 import numpy as np
 
+from sklearn.model_selection import KFold, StratifiedKFold
+
+
 def show_uniq_test_train(train, test):
     # check all values that have zero ans nan only
     for c in sorted(train.columns):
@@ -10,30 +13,60 @@ def show_uniq_test_train(train, test):
             print("%s ;train: %s; test:%s"%(c, un, tun))
 
 
+def drop_duplicates_by_key(df, key):
+    keys = df[key]
+    non_dupe_ind = keys.drop_duplicates().index
+    dupe_num = len(df) - len(non_dupe_ind)
+    print("%s duplicates" % dupe_num)
+    return df.loc[non_dupe_ind]
+
+
 def get_train():
     train_main = pd.read_csv("../data/task1/train_1.8.csv", encoding="cp1251")
-    train_aux_coords = pd.read_csv("../data/task1_additional/coords_train_1.1.csv", encoding="cp1251")
-    train_aux_frac = pd.read_csv("../data/task1_additional/frac_train_1.csv", encoding="cp1251")
-    train_aux_gdis = pd.read_csv("../data/task1_additional/gdis_train1.2.csv", encoding="cp1251")
+    train_main.drop_duplicates()
+    print("Main shape %s" % str(train_main.shape))
 
-    train_frac_main = pd.merge(train_main, train_aux_frac, how="left", left_on="Скважина", right_on="Скважина")
-    train_main_frac_gdis = pd.merge(train_frac_main, train_aux_gdis, how="left", left_on="Скважина",
+    train_aux_frac = pd.read_csv("../data/task1_additional/frac_train_1.csv", encoding="cp1251")
+    train_aux_frac = drop_duplicates_by_key(train_aux_frac, "Скважина")
+    train_frac_main = pd.merge(train_main, train_aux_frac, how="left",
+                               left_on="Скважина", right_on="Скважина")
+
+    train_aux_gdis = pd.read_csv("../data/task1_additional/gdis_train1.2.csv", encoding="cp1251")
+    train_aux_gdis = drop_duplicates_by_key(train_aux_gdis, "Скважина")
+    train_main_frac_gdis = pd.merge(train_frac_main, train_aux_gdis, how="left",
+                                    left_on="Скважина",
                                     right_on="Скважина")
-    all_recs = pd.merge(train_main_frac_gdis, train_aux_coords, how="left", left_on="Скважина", right_on="well_hash")
+
+    train_aux_coords = pd.read_csv(
+        "../data/task1_additional/coords_train_1.1.csv", encoding="cp1251")
+    train_aux_coords = drop_duplicates_by_key(train_aux_coords, "well_hash")
+    all_recs = pd.merge(train_main_frac_gdis, train_aux_coords, how="left",
+                        left_on="Скважина", right_on="well_hash")
     final_recs = all_recs.drop(["well_hash"], axis=1)
+    print("final shape %s" % str(final_recs.shape))
     return final_recs.drop_duplicates()
 
 
 def get_test():
     test_main = pd.read_csv("../data/task1/test_1.9.csv", encoding="cp1251")
-    test_aux_coords = pd.read_csv("../data/task1_additional/coords_test_1.1.csv", encoding="cp1251")
+    print("Main shape %s" % str(test_main.shape))
     test_aux_frac = pd.read_csv("../data/task1_additional/frac_test_1.csv", encoding="cp1251")
-    test_aux_gdis = pd.read_csv("../data/task1_additional/gdis_test1.2.csv", encoding="cp1251")
+    test_aux_frac = drop_duplicates_by_key(test_aux_frac, "Скважина")
 
-    test_frac_main = pd.merge(test_main, test_aux_frac, how="left", left_on="Скважина", right_on="Скважина")
+    test_frac_main = pd.merge(test_main, test_aux_frac, how="left",
+                              left_on="Скважина", right_on="Скважина")
+
+    test_aux_gdis = pd.read_csv("../data/task1_additional/gdis_test1.2.csv", encoding="cp1251")
+    test_aux_gdis = drop_duplicates_by_key(test_aux_gdis, "Скважина")
     test_main_frac_gdis = pd.merge(test_frac_main, test_aux_gdis, how="left", left_on="Скважина", right_on="Скважина")
+
+    test_aux_coords = pd.read_csv(
+        "../data/task1_additional/coords_test_1.1.csv", encoding="cp1251")
+
+    test_aux_coords = drop_duplicates_by_key(test_aux_coords, "well_hash")
     all_recs = pd.merge(test_main_frac_gdis, test_aux_coords, how="left", left_on="Скважина", right_on="well_hash")
     final_recs = all_recs.drop(["well_hash"], axis=1)
+    print("final shape %s" % str(final_recs.shape))
     return final_recs
 
 
@@ -92,9 +125,9 @@ def clean_non_targeted(train_array, y_train, dates_ord=None):
     clean_array = []
     train_array.append(y_train)
     #clear nans in target
-    indexes_to_delete = y_train[(y_train.isnull())|(y_train==0)].index
+    indexes_to_delete = y_train[(y_train.isnull())|(y_train == 0)].index
     if dates_ord is not None:
-        dates_index = dates_ord[dates_ord>=6].index
+        dates_index = dates_ord[dates_ord > 6].index
         indexes_to_delete = indexes_to_delete.union(dates_index)
     for df in train_array:
         item = df.drop(index=indexes_to_delete)

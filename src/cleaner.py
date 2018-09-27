@@ -70,7 +70,7 @@ class DataCleaner:
         self.log_shape("shape_after_column_pipelines", train_after_ppl,
                        test_after_ppl)
         if group_col:
-            train_group = train[group_col]
+            train_group = train[group_col].reindex(train_after_ppl.index)
             return train_after_ppl, test_after_ppl, target, train_group
         else:
             return train_after_ppl, test_after_ppl, target

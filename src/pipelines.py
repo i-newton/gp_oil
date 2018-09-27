@@ -357,7 +357,7 @@ cont_pipeline = ColumnPipelineStep(columns=get_cont_cols(),
                                        normalize_step])
 
 
-def get_one_hot(train, test):
+def get_one_hot(train, test, drop_first=True):
     if isinstance(train, pd.Series):
         train = train.astype(str)
         test = test.astype(str)
@@ -365,8 +365,8 @@ def get_one_hot(train, test):
         for c in train.columns:
             train[c] = train[c].astype(str)
             test[c] = test[c].astype(str)
-    train_oh = pd.get_dummies(train, drop_first=True)
-    test_oh = pd.get_dummies(test, drop_first=True)
+    train_oh = pd.get_dummies(train, drop_first=drop_first)
+    test_oh = pd.get_dummies(test, drop_first=drop_first)
     test_oh = test_oh.reindex(columns=train_oh.columns, fill_value=0)
     return train_oh, test_oh
 
