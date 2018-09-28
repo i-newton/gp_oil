@@ -118,7 +118,7 @@ def split_continious_date_categorical_text(df):
 
 
 def get_fold():
-    return KFold(n_splits = 4,shuffle=True, random_state = 17)
+    return KFold(n_splits = 5,shuffle=True, random_state = 17)
 
 
 def clean_non_targeted(train_array, y_train, dates_ord=None):
@@ -218,3 +218,9 @@ def my_loss(y_true, y_pred,**kwargs):
 
 
 my_score = make_scorer(my_loss, greater_is_better=False)
+
+
+def get_prediction(X_train, y_train, X_groups, X_test, constant = 701.4750):
+    X_step, y_step = getXY_for_step(X_train, y_train, X_groups)
+    preds = get_preds(X_step, y_step, X_test, X_train, y_train,groups)
+    return preds+(constant- np.mean(preds))
